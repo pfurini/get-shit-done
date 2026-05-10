@@ -20,9 +20,8 @@ INIT=$(gsd-sdk query state.load)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Extract `commit_docs` from init JSON. Resolve subagent models:
+Extract `commit_docs` from init JSON. Resolve session manager model:
 ```bash
-debugger_model=$(gsd-sdk query resolve-model gsd-debugger 2>/dev/null | jq -r '.model' 2>/dev/null || true)
 debug_session_manager_model=$(gsd-sdk query resolve-model gsd-debug-session-manager 2>/dev/null | jq -r '.model' 2>/dev/null || true)
 ```
 

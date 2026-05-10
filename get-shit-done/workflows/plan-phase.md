@@ -36,6 +36,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-phase-researcher)
 AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
 AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
+PATTERN_MAPPER_MODEL=$(gsd-sdk query resolve-model gsd-pattern-mapper --pick model 2>/dev/null || echo "")
 CONTEXT_WINDOW_PLANNER=$(gsd-sdk query context-window-for gsd-planner 2>/dev/null || echo "200000")
 TDD_MODE=$(gsd-sdk query config-get workflow.tdd_mode 2>/dev/null || echo "false")
 MVP_MODE_CFG=$(gsd-sdk query config-get workflow.mvp_mode 2>/dev/null || echo "false")
@@ -793,7 +794,7 @@ Spawn with:
 Agent(
   prompt="{above}",
   subagent_type="gsd-pattern-mapper",
-  model="{researcher_model}",
+  model="{PATTERN_MAPPER_MODEL}",
 )
 ```
 
