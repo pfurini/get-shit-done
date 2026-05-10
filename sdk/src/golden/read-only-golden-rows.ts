@@ -19,6 +19,7 @@ export const GOLDEN_PLAN = '.planning/phases/09-foundation-and-test-infrastructu
  */
 export const READ_ONLY_JSON_PARITY_ROWS: JsonParityRow[] = [
   { canonical: 'resolve-model', sdkArgs: ['gsd-planner'], cjs: 'resolve-model', cjsArgs: ['gsd-planner'] },
+  { canonical: 'context-window-for', sdkArgs: ['gsd-planner'], cjs: 'context-window-for', cjsArgs: ['gsd-planner'] },
   { canonical: 'phase-plan-index', sdkArgs: ['9'], cjs: 'phase-plan-index', cjsArgs: ['9'] },
   { canonical: 'roadmap.get-phase', sdkArgs: ['9'], cjs: 'roadmap', cjsArgs: ['get-phase', '9'] },
   { canonical: 'list.todos', sdkArgs: [], cjs: 'list-todos', cjsArgs: [] },

@@ -22,6 +22,7 @@
  *   state signal-waiting --type T --question Q --options "A|B" --phase P  Write WAITING.json signal
  *   state signal-resume                Remove WAITING.json signal
  *   resolve-model <agent-type>         Get model for agent based on profile
+ *   context-window-for <agent-id>      Effective context_window for an agent (1M for opus)
  *   find-phase <phase>                 Find phase directory by number
  *   commit <message> [--files f1 f2] [--no-verify]   Commit planning docs
  *   commit-to-subrepo <msg> --files f1 f2  Route commits to sub-repos
@@ -520,6 +521,11 @@ async function runCommand(command, args, cwd, raw, defaultValue, originalCommand
 
     case 'resolve-model': {
       commands.cmdResolveModel(cwd, args[1], raw);
+      break;
+    }
+
+    case 'context-window-for': {
+      commands.cmdContextWindowFor(cwd, args[1], raw);
       break;
     }
 

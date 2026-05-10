@@ -108,22 +108,18 @@ fi
 
 When `USE_WORKTREES` (project-level) is `false`, all executor agents run without `isolation="worktree"` — they execute sequentially on the main working tree instead of in parallel worktrees. The per-plan decision below has no effect when worktrees are project-disabled.
 
-Read context window size for adaptive prompt enrichment:
+Read per-agent context window for adaptive prompt enrichment. Each subagent gets its own value because subagents within the same workflow can resolve to different models (executor=sonnet while verifier=opus, etc.). When an agent's resolved model is opus, `context-window-for` returns 1_000_000 regardless of the configured global `context_window`:
 
 ```bash
-CONTEXT_WINDOW=$(gsd-sdk query config-get context_window 2>/dev/null || echo "200000")
+CONTEXT_WINDOW_EXECUTOR=$(gsd-sdk query context-window-for gsd-executor 2>/dev/null || echo "200000")
+CONTEXT_WINDOW_VERIFIER=$(gsd-sdk query context-window-for gsd-verifier 2>/dev/null || echo "200000")
 ```
 
-When `CONTEXT_WINDOW >= 500000` (1M-class models), subagent prompts include richer context:
-- Executor agents receive prior wave SUMMARY.md files and the phase CONTEXT.md/RESEARCH.md
-- Verifier agents receive all PLAN.md, SUMMARY.md, CONTEXT.md files plus REQUIREMENTS.md
-- This enables cross-phase awareness and history-aware verification
+When `CONTEXT_WINDOW_EXECUTOR >= 500000` (executor running on a 1M-class model), the executor prompt includes richer context: prior wave SUMMARY.md files and the phase CONTEXT.md/RESEARCH.md.
 
-When `CONTEXT_WINDOW < 200000` (sub-200K models), subagent prompts are thinned to reduce static overhead:
-- Executor agents omit extended deviation rule examples and checkpoint examples from inline prompt — load on-demand via @~/.claude/get-shit-done/references/executor-examples.md
-- Planner agents omit extended anti-pattern lists and specificity examples from inline prompt — load on-demand via @~/.claude/get-shit-done/references/planner-antipatterns.md
-- Core rules and decision logic remain inline; only verbose examples and edge-case lists are extracted
-- This reduces executor static overhead by ~40% while preserving behavioral correctness
+When `CONTEXT_WINDOW_VERIFIER >= 500000` (verifier running on a 1M-class model), the verifier prompt includes all PLAN.md, SUMMARY.md, CONTEXT.md files plus REQUIREMENTS.md, enabling history-aware verification.
+
+When `CONTEXT_WINDOW_EXECUTOR < 200000` (sub-200K executor model), the executor prompt is thinned: extended deviation rule examples and checkpoint examples are loaded on-demand via @~/.claude/get-shit-done/references/executor-examples.md instead of inlined. Core rules and decision logic remain inline; only verbose examples and edge-case lists are extracted. This reduces executor static overhead by ~40% while preserving behavioral correctness.
 
 **If `phase_found` is false:** Error — phase directory not found.
 **If `plan_count` is 0:** Error — no plans found in phase.
@@ -604,7 +600,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        @~/.claude/get-shit-done/references/checkpoints.md
        @~/.claude/get-shit-done/references/tdd.md
        @~/.claude/get-shit-done/references/worktree-path-safety.md
-       ${CONTEXT_WINDOW < 200000 ? '' : '@~/.claude/get-shit-done/references/executor-examples.md'}
+       ${CONTEXT_WINDOW_EXECUTOR < 200000 ? '' : '@~/.claude/get-shit-done/references/executor-examples.md'}
        </execution_context>
 
        <files_to_read>
@@ -613,7 +609,7 @@ increases monotonically across waves. `{status}` is `complete` (success),
        - .planning/PROJECT.md (Project context — core value, requirements, evolution rules)
        - .planning/STATE.md (State)
        - .planning/config.json (Config, if exists)
-       ${CONTEXT_WINDOW >= 500000 ? `
+       ${CONTEXT_WINDOW_EXECUTOR >= 500000 ? `
        - ${phase_dir}/*-CONTEXT.md (User decisions from discuss-phase — honors locked choices)
        - ${phase_dir}/*-RESEARCH.md (Technical research — pitfalls and patterns to follow)
        - ${prior_wave_summaries} (SUMMARY.md files from earlier waves in this phase — what was already built)
@@ -1468,7 +1464,7 @@ Read these files before verification:
 - {phase_dir}/*-PLAN.md (All plans — understand intent, check must_haves)
 - {phase_dir}/*-SUMMARY.md (All summaries — cross-reference claimed vs actual)
 - .planning/REQUIREMENTS.md (Requirement traceability)
-${CONTEXT_WINDOW >= 500000 ? `- {phase_dir}/*-CONTEXT.md (User decisions — verify they were honored)
+${CONTEXT_WINDOW_VERIFIER >= 500000 ? `- {phase_dir}/*-CONTEXT.md (User decisions — verify they were honored)
 - {phase_dir}/*-RESEARCH.md (Known pitfalls — check for traps)
 - Prior VERIFICATION.md files from earlier phases (regression check)
 ` : ''}

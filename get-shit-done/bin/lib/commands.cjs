@@ -248,6 +248,37 @@ function cmdResolveModel(cwd, agentType, raw) {
   output(result, raw, model);
 }
 
+// Per-agent effective context_window. When an agent's resolved model is opus
+// (alias or `claude-opus-*` ID), returns 1_000_000; otherwise the configured
+// `context_window` (default 200_000). The 1M override is unconditional —
+// matches sdk/src/query/context-window.ts contextWindowFor for golden parity.
+function cmdContextWindowFor(cwd, agentType, raw) {
+  if (!agentType) {
+    error('agent-id required');
+  }
+
+  const config = loadConfig(cwd);
+  const profile = String(config.model_profile || 'balanced').toLowerCase();
+  const rawWindow = config.context_window;
+  const configured =
+    typeof rawWindow === 'number' && Number.isFinite(rawWindow) && rawWindow > 0
+      ? rawWindow
+      : 200000;
+  const model = resolveModelInternal(cwd, agentType);
+  const opusDetected = model === 'opus' || /^claude-opus-/i.test(model);
+  const effective = opusDetected ? 1000000 : configured;
+
+  const result = {
+    agent_id: agentType,
+    model,
+    profile,
+    configured_context_window: configured,
+    effective_context_window: effective,
+    opus_detected: opusDetected,
+  };
+  output(result, raw, effective);
+}
+
 function cmdCommit(cwd, message, files, raw, amend, noVerify) {
   if (!message && !amend) {
     error('commit message required');
@@ -1015,6 +1046,7 @@ module.exports = {
   cmdVerifyPathExists,
   cmdHistoryDigest,
   cmdResolveModel,
+  cmdContextWindowFor,
   cmdCommit,
   cmdCommitToSubrepo,
   cmdSummaryExtract,
