@@ -19,6 +19,7 @@ Parse arguments and load project state:
 PHASE_ARG="${1}"
 INIT=$(gsd-sdk query init.phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+CODE_REVIEWER_MODEL=$(gsd-sdk query resolve-model gsd-code-reviewer --pick model 2>/dev/null || echo "")
 ```
 
 Parse from init JSON: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `padded_phase`, `commit_docs`.
@@ -441,7 +442,7 @@ fi
 Spawn the gsd-code-reviewer agent:
 
 ```
-Agent(subagent_type="gsd-code-reviewer", prompt="
+Agent(subagent_type="gsd-code-reviewer", model="{CODE_REVIEWER_MODEL}", prompt="
 <files_to_read>
 ${FILES_TO_READ}
 </files_to_read>

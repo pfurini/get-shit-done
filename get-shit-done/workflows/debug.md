@@ -20,9 +20,10 @@ INIT=$(gsd-sdk query state.load)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Extract `commit_docs` from init JSON. Resolve debugger model:
+Extract `commit_docs` from init JSON. Resolve subagent models:
 ```bash
 debugger_model=$(gsd-sdk query resolve-model gsd-debugger 2>/dev/null | jq -r '.model' 2>/dev/null || true)
+debug_session_manager_model=$(gsd-sdk query resolve-model gsd-debug-session-manager 2>/dev/null | jq -r '.model' 2>/dev/null || true)
 ```
 
 Read TDD mode from config:
@@ -129,7 +130,7 @@ specialist_dispatch_enabled: true
 </session_params>
 """,
   subagent_type="gsd-debug-session-manager",
-  model="{debugger_model}",
+  model="{debug_session_manager_model}",
   description="Continue debug session {SLUG}"
 )
 ```
@@ -207,7 +208,7 @@ specialist_dispatch_enabled: true
 </session_params>
 """,
   subagent_type="gsd-debug-session-manager",
-  model="{debugger_model}",
+  model="{debug_session_manager_model}",
   description="Debug session {slug}"
 )
 ```

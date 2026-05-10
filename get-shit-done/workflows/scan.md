@@ -43,6 +43,8 @@ INIT=$(gsd-sdk query init.map-codebase 2>/dev/null || echo "{}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
+Parse `mapper_model` from `INIT` (alongside `commit_docs`, `codebase_dir`, etc.) so the spawn below can pin the resolved model.
+
 Look up which documents would be produced for the selected focus (from the mapping table above).
 
 For each target document, check if it already exists in `.planning/codebase/`:
@@ -75,7 +77,7 @@ Spawn a single `gsd-codebase-mapper` agent with the selected focus area:
 Agent(
   prompt="Scan this codebase with focus: {focus}. Write results to .planning/codebase/. Produce only: {document_list}",
   subagent_type="gsd-codebase-mapper",
-  model="{resolved_model}"
+  model="{mapper_model}"
 )
 ```
 

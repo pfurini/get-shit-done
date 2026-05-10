@@ -54,6 +54,7 @@ Run the init query:
 ```bash
 INIT=$(node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" init ingest-docs)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+DOC_SYNTHESIZER_MODEL=$(gsd-sdk query resolve-model gsd-doc-synthesizer --pick model 2>/dev/null || echo "")
 ```
 
 Parse `project_exists`, `planning_exists`, `has_git`, `project_path` from INIT.
@@ -180,6 +181,7 @@ Spawn `gsd-doc-synthesizer` once:
 ```
 Agent({
   subagent_type: "gsd-doc-synthesizer",
+  model: "{DOC_SYNTHESIZER_MODEL}",
   prompt: "
     CLASSIFICATIONS_DIR: .planning/intel/classifications/
     INTEL_DIR: .planning/intel/

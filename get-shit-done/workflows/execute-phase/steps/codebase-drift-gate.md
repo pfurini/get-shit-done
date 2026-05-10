@@ -46,6 +46,7 @@ from step `init_context` is for `gsd-executor`, not the mapper):
 
 ```bash
 AGENT_SKILLS_MAPPER=$(gsd-sdk query agent-skills gsd-codebase-mapper)
+MAPPER_MODEL=$(gsd-sdk query resolve-model gsd-codebase-mapper --pick model 2>/dev/null || echo "")
 ```
 
 Then spawn `gsd-codebase-mapper` agents with the `--paths` hint:
@@ -53,6 +54,7 @@ Then spawn `gsd-codebase-mapper` agents with the `--paths` hint:
 ```text
 Agent(
   subagent_type="gsd-codebase-mapper",
+  model="{MAPPER_MODEL}",
   description="Incremental codebase remap (drift)",
   prompt="Focus: arch
 Today's date: {date}

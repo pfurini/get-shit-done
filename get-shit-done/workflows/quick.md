@@ -144,6 +144,7 @@ AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
 AGENT_SKILLS_EXECUTOR=$(gsd-sdk query agent-skills gsd-executor)
 AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
 AGENT_SKILLS_VERIFIER=$(gsd-sdk query agent-skills gsd-verifier)
+CODE_REVIEWER_MODEL=$(gsd-sdk query resolve-model gsd-code-reviewer --pick model 2>/dev/null || echo "")
 ```
 
 Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `branch_name`, `quick_id`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
@@ -952,7 +953,7 @@ Agent(
   Output: ${QUICK_DIR}/${quick_id}-REVIEW.md
   Depth: quick",
   subagent_type="gsd-code-reviewer",
-  model="{executor_model}"
+  model="{CODE_REVIEWER_MODEL}"
 )
 ```
 

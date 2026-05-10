@@ -20,6 +20,8 @@ Parse arguments and load project state:
 PHASE_ARG="${1}"
 INIT=$(gsd-sdk query init.phase-op "${PHASE_ARG}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+CODE_FIXER_MODEL=$(gsd-sdk query resolve-model gsd-code-fixer --pick model 2>/dev/null || echo "")
+CODE_REVIEWER_MODEL=$(gsd-sdk query resolve-model gsd-code-reviewer --pick model 2>/dev/null || echo "")
 ```
 
 Parse from init JSON: `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `padded_phase`, `commit_docs`.
@@ -189,7 +191,7 @@ echo "Fix scope: ${FIX_SCOPE}"
 Use Agent() to spawn agent:
 
 ```text
-Agent(subagent_type="gsd-code-fixer", prompt="
+Agent(subagent_type="gsd-code-fixer", model="{CODE_FIXER_MODEL}", prompt="
 <files_to_read>
 ${REVIEW_PATH}
 </files_to_read>
@@ -272,7 +274,7 @@ if [ "$AUTO_MODE" = "true" ]; then
     
     # Spawn gsd-code-reviewer agent to re-review
     # (This overwrites REVIEW_PATH with latest review state)
-    Agent(subagent_type="gsd-code-reviewer", prompt="
+    Agent(subagent_type="gsd-code-reviewer", model="{CODE_REVIEWER_MODEL}", prompt="
 <config>
 depth: ${REVIEW_DEPTH}
 phase_dir: ${PHASE_DIR}
@@ -306,7 +308,7 @@ Do NOT commit the output — the orchestrator handles that.
     # Still has issues — spawn fixer again
     echo "Issues remain. Applying fixes for iteration ${ITERATION}..."
     
-    Agent(subagent_type="gsd-code-fixer", prompt="
+    Agent(subagent_type="gsd-code-fixer", model="{CODE_FIXER_MODEL}", prompt="
 <files_to_read>
 ${REVIEW_PATH}
 </files_to_read>

@@ -34,6 +34,7 @@ For `audit-uat` source:
 ```bash
 INIT=$(gsd-sdk query audit-uat 2>/dev/null || echo "{}")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
+EXECUTOR_MODEL=$(gsd-sdk query resolve-model gsd-executor --pick model 2>/dev/null || echo "")
 ```
 
 Read existing UAT and verification files to extract findings:
@@ -97,7 +98,8 @@ For each **auto-fixable** finding (up to `--max`, ordered by severity desc):
 ```
 Agent(
   prompt="Fix finding {ID}: {description}. Files: {file_refs}. Make the minimal change to resolve this specific finding. Do not refactor surrounding code.",
-  subagent_type="gsd-executor"
+  subagent_type="gsd-executor",
+  model="{EXECUTOR_MODEL}"
 )
 ```
 
