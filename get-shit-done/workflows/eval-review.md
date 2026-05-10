@@ -75,15 +75,16 @@ Build file list for auditor:
 ◆ Spawning eval auditor...
 ```
 
-Build prompt:
+Spawn the auditor:
 
-```markdown
-Read ~/.claude/agents/gsd-eval-auditor.md for instructions.
+```text
+Agent(
+  prompt="Read ~/.claude/agents/gsd-eval-auditor.md for instructions.
 
 <objective>
 Conduct evaluation coverage audit of Phase {phase_number}: {phase_name}
-{If AI-SPEC exists: "Audit against AI-SPEC.md evaluation plan."}
-{If no AI-SPEC: "Audit against general AI eval best practices."}
+{If AI-SPEC exists: \"Audit against AI-SPEC.md evaluation plan.\"}
+{If no AI-SPEC: \"Audit against general AI eval best practices.\"}
 </objective>
 
 <files_to_read>
@@ -93,16 +94,18 @@ Conduct evaluation coverage audit of Phase {phase_number}: {phase_name}
 </files_to_read>
 
 <input>
-ai_spec_path: {ai_spec_path or "none"}
+ai_spec_path: {ai_spec_path or \"none\"}
 phase_dir: {phase_dir}
 phase_number: {phase_number}
 phase_name: {phase_name}
 padded_phase: {padded_phase}
 state: {A or B}
-</input>
+</input>",
+  subagent_type="general-purpose",
+  model="{AUDITOR_MODEL}",
+  description="Eval audit for Phase {phase_number}"
+)
 ```
-
-Spawn as Task with model `AUDITOR_MODEL`.
 
 ## 4. Parse Auditor Result
 

@@ -146,9 +146,11 @@ Display:
 ◆ Step 2/4 — Researching {primary_framework} docs + AI systems best practices...
 ```
 
-Spawn `gsd-ai-researcher` with:
-```markdown
-Read ~/.claude/agents/gsd-ai-researcher.md for instructions.
+Spawn `gsd-ai-researcher`:
+
+```text
+Agent(
+  prompt="Read ~/.claude/agents/gsd-ai-researcher.md for instructions.
 
 **Tool discipline (mandatory):**
 Use the Edit tool exclusively when modifying AI-SPEC.md — NEVER use Write on this file.
@@ -169,7 +171,11 @@ system_type: {system_type}
 model_provider: {model_provider}
 ai_spec_path: {ai_spec_path}
 phase_context: Phase {phase_number}: {phase_name} — {phase_goal}
-</input>
+</input>",
+  subagent_type="general-purpose",
+  model="{RESEARCHER_MODEL}",
+  description="AI framework research for Phase {phase_number}"
+)
 ```
 
 ## 8. Spawn gsd-domain-researcher
@@ -181,9 +187,11 @@ Display:
 ◆ Step 3/4 — Researching domain context and expert evaluation criteria...
 ```
 
-Spawn `gsd-domain-researcher` with:
-```markdown
-Read ~/.claude/agents/gsd-domain-researcher.md for instructions.
+Spawn `gsd-domain-researcher`:
+
+```text
+Agent(
+  prompt="Read ~/.claude/agents/gsd-domain-researcher.md for instructions.
 
 **Tool discipline (mandatory):**
 Use the Edit tool exclusively when modifying AI-SPEC.md — NEVER use Write on this file.
@@ -204,7 +212,11 @@ system_type: {system_type}
 phase_name: {phase_name}
 phase_goal: {phase_goal}
 ai_spec_path: {ai_spec_path}
-</input>
+</input>",
+  subagent_type="general-purpose",
+  model="{DOMAIN_MODEL}",
+  description="Domain research for Phase {phase_number}"
+)
 ```
 
 ## 9. Spawn gsd-eval-planner
