@@ -8485,6 +8485,10 @@ function install(isGlobal, runtime = 'claude', options = {}) {
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
+          // Skip third-party/vendored dirs — GSD does not write to these, so
+          // .claude refs there are not installer leaks (e.g. migrate-to-codex
+          // skill intentionally references .claude as the migration source).
+          if (entry.name === 'plugins' || entry.name === '.tmp' || entry.name === 'vendor_imports') continue;
           scanForLeakedPaths(fullPath);
         } else if ((entry.name.endsWith('.md') || entry.name.endsWith('.toml')) && entry.name !== 'CHANGELOG.md') {
           let content;
