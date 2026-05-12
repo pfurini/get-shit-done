@@ -70,3 +70,4 @@ vendor/
 tmp/
 .worktrees
 .envrc
+.tokensave

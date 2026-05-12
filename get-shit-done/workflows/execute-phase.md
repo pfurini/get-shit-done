@@ -1680,6 +1680,26 @@ PROJECT.md falls behind silently over multiple phases.
 gsd-sdk query commit "docs(phase-{X}): evolve PROJECT.md after phase completion" --files .planning/PROJECT.md
 ```
 
+6. **Refresh project instruction file (CLAUDE.md/AGENTS.md) — keeps the marker-bounded sections in sync with PROJECT.md:**
+
+   `generate-claude-md --auto` is idempotent and skips any section that has been manually
+   edited (see `detectManualEdit` in `sdk/src/query/profile-output.ts`). It auto-routes to
+   `AGENTS.md` for codex runtimes and `CLAUDE.md` otherwise. Commit only if the file
+   actually changed — most phase completions touch nothing here.
+
+   ```bash
+   CLAUDE_MD_JSON=$(gsd-sdk query generate-claude-md --auto 2>/dev/null || echo '{}')
+   CLAUDE_MD_PATH=$(echo "$CLAUDE_MD_JSON" | jq -r '.data.claude_md_path // .claude_md_path // empty' 2>/dev/null)
+
+   if [ -n "$CLAUDE_MD_PATH" ] && [ -f "$CLAUDE_MD_PATH" ]; then
+     if ! git diff --quiet -- "$CLAUDE_MD_PATH" 2>/dev/null || ! git diff --cached --quiet -- "$CLAUDE_MD_PATH" 2>/dev/null; then
+       gsd-sdk query commit "docs(phase-{X}): refresh $(basename "$CLAUDE_MD_PATH") after PROJECT.md update" --files "$CLAUDE_MD_PATH"
+     fi
+   fi
+   ```
+
+   Failures in this sub-step must NOT block phase completion — `update_project_md` is best-effort drift prevention. If the regen errors, log a warning and continue.
+
 **Skip this step if** `.planning/PROJECT.md` does not exist.
 </step>
 
