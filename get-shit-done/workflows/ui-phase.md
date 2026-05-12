@@ -23,6 +23,17 @@ INIT=$(gsd-sdk query init.plan-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_UI=$(gsd-sdk query agent-skills gsd-ui-researcher)
 AGENT_SKILLS_UI_CHECKER=$(gsd-sdk query agent-skills gsd-ui-checker)
+SEARCH_CONTEXT=""  # built from init JSON below
+```
+
+Build `SEARCH_CONTEXT` from init JSON flags (`brave_search_available`, `firecrawl_available`, `exa_search_available`):
+
+```text
+SEARCH_CONTEXT="<search_context>
+brave_search: {brave_search_available}
+firecrawl: {firecrawl_available}
+exa_search: {exa_search_available}
+</search_context>"
 ```
 
 Parse JSON for: `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `padded_phase`, `has_context`, `has_research`, `commit_docs`.
@@ -140,6 +151,8 @@ Answer: "What visual and interaction contracts does this phase need?"
 </files_to_read>
 
 ${AGENT_SKILLS_UI}
+
+${SEARCH_CONTEXT}
 
 <output>
 Write to: {phase_dir}/{padded_phase}-UI-SPEC.md

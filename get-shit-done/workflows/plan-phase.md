@@ -36,6 +36,17 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-phase-researcher)
 AGENT_SKILLS_PLANNER=$(gsd-sdk query agent-skills gsd-planner)
 AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
+SEARCH_CONTEXT=""  # built from init JSON below
+```
+
+Build `SEARCH_CONTEXT` from init JSON flags (`brave_search_available`, `firecrawl_available`, `exa_search_available`):
+
+```text
+SEARCH_CONTEXT="<search_context>
+brave_search: {brave_search_available}
+firecrawl: {firecrawl_available}
+exa_search: {exa_search_available}
+</search_context>"
 PATTERN_MAPPER_MODEL=$(gsd-sdk query resolve-model gsd-pattern-mapper --pick model 2>/dev/null || echo "")
 CONTEXT_WINDOW_PLANNER=$(gsd-sdk query context-window-for gsd-planner 2>/dev/null || echo "200000")
 TDD_MODE=$(gsd-sdk query config-get workflow.tdd_mode 2>/dev/null || echo "false")
@@ -461,6 +472,8 @@ Answer: "What do I need to know to PLAN this phase well?"
 </files_to_read>
 
 ${AGENT_SKILLS_RESEARCHER}
+
+${SEARCH_CONTEXT}
 
 <additional_context>
 **Phase description:** {phase_description}

@@ -145,6 +145,17 @@ AGENT_SKILLS_EXECUTOR=$(gsd-sdk query agent-skills gsd-executor)
 AGENT_SKILLS_CHECKER=$(gsd-sdk query agent-skills gsd-plan-checker)
 AGENT_SKILLS_VERIFIER=$(gsd-sdk query agent-skills gsd-verifier)
 CODE_REVIEWER_MODEL=$(gsd-sdk query resolve-model gsd-code-reviewer --pick model 2>/dev/null || echo "")
+SEARCH_CONTEXT=""  # built from init JSON below
+```
+
+Build `SEARCH_CONTEXT` from init JSON flags (`brave_search_available`, `firecrawl_available`, `exa_search_available`):
+
+```text
+SEARCH_CONTEXT="<search_context>
+brave_search: {brave_search_available}
+firecrawl: {firecrawl_available}
+exa_search: {exa_search_available}
+</search_context>"
 ```
 
 Parse JSON for: `planner_model`, `executor_model`, `checker_model`, `verifier_model`, `commit_docs`, `branch_name`, `quick_id`, `slug`, `date`, `timestamp`, `quick_dir`, `task_dir`, `roadmap_exists`, `planning_exists`.
@@ -419,6 +430,8 @@ ${DISCUSS_MODE ? '- ' + QUICK_DIR + '/' + quick_id + '-CONTEXT.md (User decision
 </files_to_read>
 
 ${AGENT_SKILLS_PLANNER}
+
+${SEARCH_CONTEXT}
 
 </research_context>
 

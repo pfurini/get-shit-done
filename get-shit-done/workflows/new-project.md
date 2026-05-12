@@ -62,6 +62,17 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-project-researcher)
 AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-research-synthesizer)
 AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper)
+SEARCH_CONTEXT=""  # built from init JSON below
+```
+
+Build `SEARCH_CONTEXT` from init JSON flags (`brave_search_available`, `firecrawl_available`, `exa_search_available`):
+
+```text
+SEARCH_CONTEXT="<search_context>
+brave_search: {brave_search_available}
+firecrawl: {firecrawl_available}
+exa_search: {exa_search_available}
+</search_context>"
 ```
 
 Parse JSON for: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `project_exists`, `has_codebase_map`, `planning_exists`, `has_existing_code`, `has_package_file`, `is_brownfield`, `needs_codebase_map`, `has_git`, `project_path`, `agents_installed`, `missing_agents`, `agent_runtime`, `agents_dir`, `required_agents`, `required_agents_installed`, `missing_required_agents`, `agent_skill_payloads_available`, `agent_skill_payload_agents`.
@@ -821,6 +832,8 @@ What's the standard 2025 stack for [domain]?
 
 ${AGENT_SKILLS_RESEARCHER}
 
+${SEARCH_CONTEXT}
+
 <downstream_consumer>
 Your STACK.md feeds into roadmap creation. Be prescriptive:
 - Specific libraries with versions
@@ -860,6 +873,8 @@ What features do [domain] products have? What's table stakes vs differentiating?
 </files_to_read>
 
 ${AGENT_SKILLS_RESEARCHER}
+
+${SEARCH_CONTEXT}
 
 <downstream_consumer>
 Your FEATURES.md feeds into requirements definition. Categorize clearly:
@@ -901,6 +916,8 @@ How are [domain] systems typically structured? What are major components?
 
 ${AGENT_SKILLS_RESEARCHER}
 
+${SEARCH_CONTEXT}
+
 <downstream_consumer>
 Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 - Component boundaries (what talks to what)
@@ -940,6 +957,8 @@ What do [domain] projects commonly get wrong? Critical mistakes?
 </files_to_read>
 
 ${AGENT_SKILLS_RESEARCHER}
+
+${SEARCH_CONTEXT}
 
 <downstream_consumer>
 Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:

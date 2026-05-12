@@ -11,6 +11,15 @@ const { maskIfSecret } = require('./secrets.cjs');
 const scanPhasePlans = require('./plan-scan.cjs');
 const { stateExtractField } = require('./state-document.cjs');
 
+function detectSearchCapabilities() {
+  const homedir = require('os').homedir();
+  return {
+    brave_search_available: !!(process.env.BRAVE_API_KEY || fs.existsSync(path.join(homedir, '.gsd', 'brave_api_key'))),
+    firecrawl_available: !!(process.env.FIRECRAWL_API_KEY || fs.existsSync(path.join(homedir, '.gsd', 'firecrawl_api_key'))),
+    exa_search_available: !!(process.env.EXA_API_KEY || fs.existsSync(path.join(homedir, '.gsd', 'exa_api_key'))),
+  };
+}
+
 // Accept all bold/colon variants of the Requirements header (#2769):
 // **Requirements:** / **Requirements**: / **Requirements** : render the
 // same in markdown but differ textually.
@@ -306,6 +315,9 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     planning_exists: fs.existsSync(planningDir(cwd)),
     roadmap_exists: fs.existsSync(path.join(planningDir(cwd), 'ROADMAP.md')),
 
+    // Enhanced search
+    ...detectSearchCapabilities(),
+
     // File paths
     state_path: toPosixPath(path.relative(cwd, path.join(planningDir(cwd), 'STATE.md'))),
     roadmap_path: toPosixPath(path.relative(cwd, path.join(planningDir(cwd), 'ROADMAP.md'))),
@@ -371,18 +383,7 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
 function cmdInitNewProject(cwd, raw) {
   const config = loadConfig(cwd);
 
-  // Detect Brave Search API key availability
-  const homedir = require('os').homedir();
-  const braveKeyFile = path.join(homedir, '.gsd', 'brave_api_key');
-  const hasBraveSearch = !!(process.env.BRAVE_API_KEY || fs.existsSync(braveKeyFile));
-
-  // Detect Firecrawl API key availability
-  const firecrawlKeyFile = path.join(homedir, '.gsd', 'firecrawl_api_key');
-  const hasFirecrawl = !!(process.env.FIRECRAWL_API_KEY || fs.existsSync(firecrawlKeyFile));
-
-  // Detect Exa API key availability
-  const exaKeyFile = path.join(homedir, '.gsd', 'exa_api_key');
-  const hasExaSearch = !!(process.env.EXA_API_KEY || fs.existsSync(exaKeyFile));
+  const { brave_search_available: hasBraveSearch, firecrawl_available: hasFirecrawl, exa_search_available: hasExaSearch } = detectSearchCapabilities();
 
   // Detect existing code (cross-platform — no Unix `find` dependency)
   let hasCode = false;
@@ -514,6 +515,9 @@ function cmdInitNewMilestone(cwd, raw) {
     roadmap_exists: fs.existsSync(path.join(planningDir(cwd), 'ROADMAP.md')),
     state_exists: fs.existsSync(path.join(planningDir(cwd), 'STATE.md')),
 
+    // Enhanced search
+    ...detectSearchCapabilities(),
+
     // File paths
     project_path: '.planning/PROJECT.md',
     roadmap_path: toPosixPath(path.relative(cwd, path.join(planningDir(cwd), 'ROADMAP.md'))),
@@ -571,6 +575,9 @@ function cmdInitQuick(cwd, description, raw) {
     // Paths
     quick_dir: '.planning/quick',
     task_dir: slug ? `.planning/quick/${quickId}-${slug}` : null,
+
+    // Enhanced search
+    ...detectSearchCapabilities(),
 
     // File existence
     roadmap_exists: fs.existsSync(path.join(planningDir(cwd), 'ROADMAP.md')),

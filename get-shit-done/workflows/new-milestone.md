@@ -223,6 +223,17 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_RESEARCHER=$(gsd-sdk query agent-skills gsd-project-researcher)
 AGENT_SKILLS_SYNTHESIZER=$(gsd-sdk query agent-skills gsd-research-synthesizer)
 AGENT_SKILLS_ROADMAPPER=$(gsd-sdk query agent-skills gsd-roadmapper)
+SEARCH_CONTEXT=""  # built from init JSON below
+```
+
+Build `SEARCH_CONTEXT` from init JSON flags (`brave_search_available`, `firecrawl_available`, `exa_search_available`):
+
+```text
+SEARCH_CONTEXT="<search_context>
+brave_search: {brave_search_available}
+firecrawl: {firecrawl_available}
+exa_search: {exa_search_available}
+</search_context>"
 ```
 
 Extract from init JSON: `researcher_model`, `synthesizer_model`, `roadmapper_model`, `commit_docs`, `research_enabled`, `current_milestone`, `project_exists`, `roadmap_exists`, `latest_completed_milestone`, `phase_dir_count`, `phase_archive_path`, `agents_installed`, `missing_agents`.
@@ -314,6 +325,8 @@ Focus ONLY on what's needed for the NEW features.
 </files_to_read>
 
 ${AGENT_SKILLS_RESEARCHER}
+
+${SEARCH_CONTEXT}
 
 <downstream_consumer>{CONSUMER}</downstream_consumer>
 

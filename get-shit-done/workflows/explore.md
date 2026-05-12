@@ -58,10 +58,28 @@ This would take ~30 seconds and might surface useful context.
 [Yes, research this] / [No, let's keep exploring]
 ```
 
-If yes, spawn a research agent:
+If yes, build search context from the project init (if available) or detect search tools directly:
+
+```bash
+SEARCH_FLAGS=$(gsd-sdk query config-get exa_search 2>/dev/null || echo "")
+```
+
+Construct a `SEARCH_CONTEXT` block with the available search flags (`brave_search_available`, `firecrawl_available`, `exa_search_available`) from init JSON, or check whether `mcp__exa__web_search_exa`, `mcp__firecrawl__scrape`, or Brave Search SDK tools are available in the current session. Build:
+
+```text
+SEARCH_CONTEXT="<search_context>
+brave_search: {brave_search_available}
+firecrawl: {firecrawl_available}
+exa_search: {exa_search_available}
+</search_context>"
+```
+
+Then spawn a research agent:
 ```
 Agent(
-  prompt="Quick research: {specific_question}. Return 3-5 key findings, no more than 200 words.",
+  prompt="Quick research: {specific_question}. Return 3-5 key findings, no more than 200 words.
+
+${SEARCH_CONTEXT}",
   subagent_type="gsd-phase-researcher"
 )
 ```
