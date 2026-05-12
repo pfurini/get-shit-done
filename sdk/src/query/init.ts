@@ -78,6 +78,19 @@ function pathExists(base: string, relPath: string): boolean {
   return existsSync(join(base, relPath));
 }
 
+export function detectSearchCapabilities(): {
+  brave_search_available: boolean;
+  firecrawl_available: boolean;
+  exa_search_available: boolean;
+} {
+  const gsdHome = join(homedir(), '.gsd');
+  return {
+    brave_search_available: !!(process.env.BRAVE_API_KEY || existsSync(join(gsdHome, 'brave_api_key'))),
+    firecrawl_available: !!(process.env.FIRECRAWL_API_KEY || existsSync(join(gsdHome, 'firecrawl_api_key'))),
+    exa_search_available: !!(process.env.EXA_API_KEY || existsSync(join(gsdHome, 'exa_api_key'))),
+  };
+}
+
 /**
  * Compute the canonical phase directory name for a known phase entry from the
  * roadmap when no directory exists yet.  Applies the project_code prefix so
@@ -472,6 +485,7 @@ export const initPlanPhase: QueryHandler = async (args, projectDir, workstream) 
     plan_count: plans.length,
     planning_exists: existsSync(planningDir),
     roadmap_exists: existsSync(join(planningDir, 'ROADMAP.md')),
+    ...detectSearchCapabilities(),
     state_path: toPosixPath(relative(projectDir, join(planningDir, 'STATE.md'))),
     roadmap_path: toPosixPath(relative(projectDir, join(planningDir, 'ROADMAP.md'))),
     requirements_path: toPosixPath(relative(projectDir, join(planningDir, 'REQUIREMENTS.md'))),
@@ -543,6 +557,7 @@ export const initNewMilestone: QueryHandler = async (_args, projectDir) => {
     phase_archive_path: latestCompleted
       ? toPosixPath(relative(projectDir, join(projectDir, '.planning', 'milestones', `${latestCompleted.version}-phases`)))
       : null,
+    ...detectSearchCapabilities(),
     project_exists: pathExists(projectDir, '.planning/PROJECT.md'),
     roadmap_exists: existsSync(join(planningDir, 'ROADMAP.md')),
     state_exists: existsSync(join(planningDir, 'STATE.md')),
@@ -608,6 +623,7 @@ export const initQuick: QueryHandler = async (args, projectDir) => {
     timestamp: now.toISOString(),
     quick_dir: '.planning/quick',
     task_dir: slug ? `.planning/quick/${quickId}-${slug}` : null,
+    ...detectSearchCapabilities(),
     roadmap_exists: existsSync(join(planningDir, 'ROADMAP.md')),
     planning_exists: existsSync(join(projectDir, '.planning')),
   };

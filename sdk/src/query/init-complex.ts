@@ -21,8 +21,6 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { homedir } from 'node:os';
-
 import { loadConfig } from '../config.js';
 import { resolveModel } from './config-query.js';
 import {
@@ -40,7 +38,7 @@ import {
   extractPhasesFromSection,
 } from './roadmap.js';
 import { agentSkills } from './skills.js';
-import { withProjectRoot } from './init.js';
+import { withProjectRoot, detectSearchCapabilities } from './init.js';
 import type { QueryHandler } from './utils.js';
 
 // ─── Internal helpers ──────────────────────────────────────────────────────
@@ -168,20 +166,7 @@ function listPhasePlanAndSummaryCounts(phasePath: string): { plans: string[]; su
 export const initNewProject: QueryHandler = async (_args, projectDir, workstream) => {
   const config = await loadConfig(projectDir, workstream);
 
-  // Detect search API key availability from env vars and ~/.gsd/ files
-  const gsdHome = join(homedir(), '.gsd');
-  const hasBraveSearch = !!(
-    process.env.BRAVE_API_KEY ||
-    existsSync(join(gsdHome, 'brave_api_key'))
-  );
-  const hasFirecrawl = !!(
-    process.env.FIRECRAWL_API_KEY ||
-    existsSync(join(gsdHome, 'firecrawl_api_key'))
-  );
-  const hasExaSearch = !!(
-    process.env.EXA_API_KEY ||
-    existsSync(join(gsdHome, 'exa_api_key'))
-  );
+  const { brave_search_available: hasBraveSearch, firecrawl_available: hasFirecrawl, exa_search_available: hasExaSearch } = detectSearchCapabilities();
 
   // Detect existing code (depth-limited scan, no external tools)
   const codeExtensions = new Set([
