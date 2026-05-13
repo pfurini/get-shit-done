@@ -1078,6 +1078,7 @@ This resolves `gsd-planner` → `gpt-5.4` (xhigh), `gsd-executor` → `gpt-5.3-c
 | `GEMINI_API_KEY` | Detected by context monitor to switch hook event name |
 | `WSL_DISTRO_NAME` | Detected by installer for WSL path handling |
 | `GSD_SKIP_SCHEMA_CHECK` | Skip schema drift detection during execute-phase (v1.31) |
+| `GSD_SKIP_PUSH_CHECK` | Skip the main/origin drift prompt before branch-per-phase fork. When local default branch is ahead of origin, branch off origin anyway (local-only commits will not appear on the phase branch). Use in CI / non-interactive contexts. |
 | `GSD_PROJECT` | Override project root for multi-project workspace support (v1.32) |
 
 ---

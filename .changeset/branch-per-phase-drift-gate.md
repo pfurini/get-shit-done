@@ -1,0 +1,4 @@
+---
+type: Fixed
+---
+**Branch-per-phase: prompt to push when local default branch is ahead of origin.** When `branching_strategy=phase` and the prior discuss/plan phase committed planning artifacts to local `main` without pushing, `/gsd-execute-phase` previously forked the new phase branch off `origin/$DEFAULT_BRANCH` (per the `#2916` fix), silently leaving the unpushed local commits off the new branch and forcing manual cherry-picks. The `handle_branching` step now runs a drift check after `git fetch`: if local `$DEFAULT_BRANCH` is ahead of `origin/$DEFAULT_BRANCH`, the orchestrator prompts the user to (1) push and branch off origin (recommended, preserves the `#2916` fix's intent), (2) branch off local `$DEFAULT_BRANCH` to keep the unpushed commits on the new branch, or (3) abort. Non-interactive callers can set `GSD_SKIP_PUSH_CHECK=true` to retain the previous origin-only behavior.

@@ -265,29 +265,131 @@ Check `branching_strategy` from init:
 
 Fork the new phase branch off `origin/HEAD` (the project's default branch), not the current HEAD — otherwise consecutive phases compound and stay unpushed (#2916). If `$BRANCH_NAME` already exists locally, reuse it as-is.
 
+**Drift gate (#2916 follow-up):** If local `$DEFAULT_BRANCH` is ahead of `origin/$DEFAULT_BRANCH`, branching off `origin/$DEFAULT_BRANCH` would silently leave the local-only commits (typically planning artifacts from prior discuss/plan phases) off the new phase branch. The orchestrator MUST resolve this before the checkout — push the unpushed commits, branch off local instead, or abort.
+
+### Stage 1 — detect
+
 ```bash
 DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
 DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
 
 if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+  # Existing branch path — no fork needed, no drift question.
   git switch "$BRANCH_NAME" || { echo "ERROR: Could not switch to existing branch '$BRANCH_NAME'." >&2; exit 1; }
+  printf '{"action":"reused_existing","default_branch":"%s","drift_ahead":0}\n' "$DEFAULT_BRANCH"
 else
+  # Fork path — fetch first so the drift comparison is against fresh origin.
+  FETCH_OK=true
   if ! git fetch --quiet origin "$DEFAULT_BRANCH"; then  # #2916
     git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH" \
       || { echo "ERROR: fetch origin/$DEFAULT_BRANCH failed and no local copy exists. Refusing to create '$BRANCH_NAME' off current HEAD (#2916)." >&2; exit 1; }
     echo "WARNING: fetch origin/$DEFAULT_BRANCH failed; using local copy as base." >&2
+    FETCH_OK=false
   fi
-  if [ -n "$(git status --porcelain)" ]; then
-    echo "WARNING: Uncommitted changes will be carried onto '$BRANCH_NAME' (branched off origin/$DEFAULT_BRANCH, not previous HEAD)."
-  else
-    git switch --quiet "$DEFAULT_BRANCH" 2>/dev/null && git merge --ff-only --quiet "origin/$DEFAULT_BRANCH" 2>/dev/null || true
+
+  # Count commits on local $DEFAULT_BRANCH that are NOT on origin/$DEFAULT_BRANCH.
+  # If both refs exist and the count is > 0, the new phase branch would lose those
+  # commits when forked off origin. Typical cause: plan/discuss-phase committed
+  # planning artifacts to local main without pushing.
+  DRIFT_AHEAD=0
+  DRIFT_LOG=""
+  if git show-ref --verify --quiet "refs/heads/$DEFAULT_BRANCH" \
+     && git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
+    DRIFT_AHEAD=$(git rev-list --count "origin/$DEFAULT_BRANCH..$DEFAULT_BRANCH" 2>/dev/null || echo 0)
+    if [ "${DRIFT_AHEAD:-0}" -gt 0 ]; then
+      DRIFT_LOG=$(git --no-pager log --oneline "origin/$DEFAULT_BRANCH..$DEFAULT_BRANCH" | head -10)
+    fi
   fi
-  # Pinned base + fail-fast: on success HEAD is exactly at origin/$DEFAULT_BRANCH,
-  # so a post-creation merge-base or "ahead-of" guard would be unreachable. The
-  # explicit base argument here is the single source of correctness for #2916.
-  git checkout -b "$BRANCH_NAME" "origin/$DEFAULT_BRANCH" \
-    || { echo "ERROR: Could not create '$BRANCH_NAME' from origin/$DEFAULT_BRANCH (#2916)." >&2; exit 1; }
+
+  if [ "${DRIFT_AHEAD:-0}" -gt 0 ]; then
+    echo ""
+    echo "Local '$DEFAULT_BRANCH' is ahead of 'origin/$DEFAULT_BRANCH' by $DRIFT_AHEAD commit(s):"
+    echo "$DRIFT_LOG"
+    echo ""
+  fi
+
+  # JSON contract for the orchestrator (last line of stdout for easy parsing).
+  printf '{"action":"needs_fork","default_branch":"%s","drift_ahead":%s,"fetch_ok":%s}\n' \
+    "$DEFAULT_BRANCH" "${DRIFT_AHEAD:-0}" "$FETCH_OK"
 fi
+```
+
+### Stage 2 — decide
+
+Parse the JSON line printed by Stage 1. Fields: `action`, `default_branch`, `drift_ahead`, `fetch_ok`.
+
+- **`action == "reused_existing"`:** Branch already prepared. Skip to "All subsequent commits…" line below.
+- **`action == "needs_fork"` AND `drift_ahead == 0`:** Proceed to Stage 3 (`mode=origin`) immediately. No prompt.
+- **`action == "needs_fork"` AND `drift_ahead > 0`:** Resolve drift before forking.
+
+Check override:
+```bash
+SKIP_PUSH_CHECK=$(echo "${GSD_SKIP_PUSH_CHECK:-false}")
+```
+
+**If `SKIP_PUSH_CHECK` is `true`:** Display:
+```
+⚠ Local '$DEFAULT_BRANCH' ahead of origin by $DRIFT_AHEAD commit(s) but GSD_SKIP_PUSH_CHECK=true — branching off origin anyway. Local-only commits will not appear on '$BRANCH_NAME'.
+```
+→ Proceed to Stage 3 (`mode=origin`).
+
+**Otherwise**, display the three options and prompt the user.
+
+```
+## Unpushed commits on '$DEFAULT_BRANCH'
+
+Local '$DEFAULT_BRANCH' is ahead of 'origin/$DEFAULT_BRANCH' by $DRIFT_AHEAD commit(s).
+These are typically planning artifacts committed by prior discuss/plan phases.
+
+Branching '$BRANCH_NAME' off 'origin/$DEFAULT_BRANCH' (the normal #2916 path) would
+silently leave those commits off the new phase branch. Pick how to proceed:
+
+1. Push '$DEFAULT_BRANCH' to origin, then branch off origin (recommended)
+2. Branch off local '$DEFAULT_BRANCH' instead — keeps unpushed commits on the new branch
+3. Abort — let me push or rebase manually
+```
+
+If `TEXT_MODE` is true, present as a plain-text numbered list. Otherwise use AskUserQuestion with header "Push?" and the three options above (option 1 marked Recommended).
+
+- **Option 1:** `FORK_MODE=push_then_origin`.
+- **Option 2:** `FORK_MODE=local`.
+- **Option 3:** Stop the workflow with `exit 1`. Report: "Aborted by user — resolve drift between local '$DEFAULT_BRANCH' and origin, then re-run /gsd-execute-phase."
+
+### Stage 3 — fork
+
+When invoking the Stage 3 bash block, the orchestrator MUST prefix it with the resolved `FORK_MODE` (e.g., `FORK_MODE=push_then_origin bash ...`). The block re-resolves `DEFAULT_BRANCH` itself so it does not depend on Stage 1's shell state.
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
+FORK_MODE=${FORK_MODE:-origin}
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "WARNING: Uncommitted changes will be carried onto '$BRANCH_NAME'."
+else
+  git switch --quiet "$DEFAULT_BRANCH" 2>/dev/null && git merge --ff-only --quiet "origin/$DEFAULT_BRANCH" 2>/dev/null || true
+fi
+
+case "$FORK_MODE" in
+  push_then_origin)
+    git push --quiet origin "$DEFAULT_BRANCH" \
+      || { echo "ERROR: Could not push '$DEFAULT_BRANCH' to origin. Re-run after resolving (or pick option 2 to branch off local)." >&2; exit 1; }
+    git checkout -b "$BRANCH_NAME" "origin/$DEFAULT_BRANCH" \
+      || { echo "ERROR: Could not create '$BRANCH_NAME' from origin/$DEFAULT_BRANCH after push." >&2; exit 1; }
+    ;;
+  local)
+    git checkout -b "$BRANCH_NAME" "$DEFAULT_BRANCH" \
+      || { echo "ERROR: Could not create '$BRANCH_NAME' from local '$DEFAULT_BRANCH'." >&2; exit 1; }
+    echo "NOTE: Branched off local '$DEFAULT_BRANCH'; '$BRANCH_NAME' carries commits not yet on origin."
+    ;;
+  origin|*)
+    # Pinned base + fail-fast: on success HEAD is exactly at origin/$DEFAULT_BRANCH,
+    # so a post-creation merge-base or "ahead-of" guard would be unreachable. The
+    # explicit base argument here is the single source of correctness for #2916.
+    git checkout -b "$BRANCH_NAME" "origin/$DEFAULT_BRANCH" \
+      || { echo "ERROR: Could not create '$BRANCH_NAME' from origin/$DEFAULT_BRANCH (#2916)." >&2; exit 1; }
+    ;;
+esac
 ```
 
 All subsequent commits go to this branch. User handles merging.
