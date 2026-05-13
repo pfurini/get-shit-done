@@ -51,6 +51,7 @@ export const VALID_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'code_quality.fallow.mcp',
   'ship.pr_body_sections',
   'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
+  'git.squash_planning_commits_before_fork',
   'planning.commit_docs', 'planning.search_gitignored', 'planning.sub_repos',
   'review.default_reviewers',
   'review.ollama_host', 'review.lm_studio_host', 'review.llama_cpp_host',

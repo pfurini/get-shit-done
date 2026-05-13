@@ -142,6 +142,7 @@ function cmdInitExecutePhase(cwd, phase, raw, options = {}) {
     branching_strategy: config.branching_strategy,
     phase_branch_template: config.phase_branch_template,
     milestone_branch_template: config.milestone_branch_template,
+    squash_planning_commits_before_fork: config.squash_planning_commits_before_fork,
     verifier_enabled: config.verifier,
 
     // Phase info

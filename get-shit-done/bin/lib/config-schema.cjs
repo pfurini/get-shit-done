@@ -49,6 +49,7 @@ const VALID_CONFIG_KEYS = new Set([
   'code_quality.fallow.mcp',
   'ship.pr_body_sections',
   'git.branching_strategy', 'git.base_branch', 'git.phase_branch_template', 'git.milestone_branch_template', 'git.quick_branch_template',
+  'git.squash_planning_commits_before_fork',
   'planning.commit_docs', 'planning.search_gitignored', 'planning.sub_repos',
   'review.ollama_host', 'review.lm_studio_host', 'review.llama_cpp_host',
   'review.default_reviewers',

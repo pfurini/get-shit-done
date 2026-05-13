@@ -376,6 +376,7 @@ export const initExecutePhase: QueryHandler = async (args, projectDir, workstrea
     branching_strategy: config.git.branching_strategy,
     phase_branch_template: config.git.phase_branch_template,
     milestone_branch_template: config.git.milestone_branch_template,
+    squash_planning_commits_before_fork: config.git.squash_planning_commits_before_fork,
     verifier_enabled: config.workflow.verifier,
     phase_found: !!phaseInfo,
     phase_dir: (phaseInfo?.directory as string) ?? null,

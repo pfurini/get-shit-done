@@ -289,6 +289,8 @@ const CONFIG_DEFAULTS = {
   phase_branch_template: 'gsd/phase-{phase}-{slug}',
   milestone_branch_template: 'gsd/{milestone}-{slug}',
   quick_branch_template: null,
+  squash_planning_commits_before_fork: false, // opt-in: consolidate contiguous .planning-only commits on default branch before phase branch fork
+
   research: true,
   plan_checker: true,
   verifier: true,
@@ -486,6 +488,7 @@ function loadConfig(cwd, options = {}) {
       phase_branch_template: get('phase_branch_template', { section: 'git', field: 'phase_branch_template' }) ?? defaults.phase_branch_template,
       milestone_branch_template: get('milestone_branch_template', { section: 'git', field: 'milestone_branch_template' }) ?? defaults.milestone_branch_template,
       quick_branch_template: get('quick_branch_template', { section: 'git', field: 'quick_branch_template' }) ?? defaults.quick_branch_template,
+      squash_planning_commits_before_fork: get('squash_planning_commits_before_fork', { section: 'git', field: 'squash_planning_commits_before_fork' }) ?? defaults.squash_planning_commits_before_fork,
       research: get('research', { section: 'workflow', field: 'research' }) ?? defaults.research,
       plan_checker: get('plan_checker', { section: 'workflow', field: 'plan_check' }) ?? defaults.plan_checker,
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,

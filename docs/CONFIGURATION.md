@@ -545,6 +545,7 @@ All four fields are **optional and additive** — STATE.md files without them ke
 | `git.phase_branch_template` | string | `gsd/phase-{phase}-{slug}` | Branch name template for phase strategy |
 | `git.milestone_branch_template` | string | `gsd/{milestone}-{slug}` | Branch name template for milestone strategy |
 | `git.quick_branch_template` | string or null | `null` | Optional branch name template for `/gsd-quick` tasks |
+| `git.squash_planning_commits_before_fork` | bool | `false` | Opt-in. When on a `phase`/`milestone` branch strategy with auto-commit producing `.planning/`-only commits on the default branch, `/gsd-execute-phase` detects the contiguous run of `.planning`-only commits at HEAD and offers to squash them into a single doc commit before forking. Aborts if any candidate commit is already on `origin/<defaultBranch>`. No-op when the run is shorter than 2 commits or HEAD is not on the default branch. |
 
 ### Strategy Comparison
 

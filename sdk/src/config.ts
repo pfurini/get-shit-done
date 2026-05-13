@@ -16,6 +16,13 @@ export interface GitConfig {
   phase_branch_template: string;
   milestone_branch_template: string;
   quick_branch_template: string | null;
+  /**
+   * When true (opt-in), execute-phase squashes the contiguous run of `.planning/`-only
+   * commits at HEAD on the default branch into a single doc commit before forking
+   * the phase branch. Skipped if HEAD is not the default branch, if any candidate
+   * commit is already on `origin/<defaultBranch>`, or if the run is shorter than 2.
+   */
+  squash_planning_commits_before_fork: boolean;
 }
 
 export interface WorkflowConfig {
@@ -99,6 +106,7 @@ export const CONFIG_DEFAULTS: GSDConfig = {
     phase_branch_template: 'gsd/phase-{phase}-{slug}',
     milestone_branch_template: 'gsd/{milestone}-{slug}',
     quick_branch_template: null,
+    squash_planning_commits_before_fork: false,
   },
   workflow: {
     research: true,

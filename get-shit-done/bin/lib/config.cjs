@@ -166,6 +166,7 @@ function buildNewProjectConfig(userChoices) {
       phase_branch_template: CONFIG_DEFAULTS.phase_branch_template,
       milestone_branch_template: CONFIG_DEFAULTS.milestone_branch_template,
       quick_branch_template: CONFIG_DEFAULTS.quick_branch_template,
+      squash_planning_commits_before_fork: CONFIG_DEFAULTS.squash_planning_commits_before_fork,
     },
     workflow: {
       research: true,

@@ -71,7 +71,7 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS=$(gsd-sdk query agent-skills gsd-executor)
 ```
 
-Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`, `response_language`.
+Parse JSON for: `executor_model`, `verifier_model`, `commit_docs`, `parallelization`, `branching_strategy`, `branch_name`, `squash_planning_commits_before_fork`, `phase_found`, `phase_dir`, `phase_number`, `phase_name`, `phase_slug`, `plans`, `incomplete_plans`, `plan_count`, `incomplete_count`, `state_exists`, `roadmap_exists`, `phase_req_ids`, `response_language`.
 
 **Model resolution:** If `executor_model` is `"inherit"`, omit the `model=` parameter from all `Agent()` calls — do NOT pass `model="inherit"` to Agent. Omitting the `model=` parameter causes Claude Code to inherit the current orchestrator model automatically. Only set `model=` when `executor_model` is an explicit model name (e.g., `"claude-sonnet-4-6"`, `"claude-opus-4-7"`).
 
@@ -313,6 +313,144 @@ else
     "$DEFAULT_BRANCH" "${DRIFT_AHEAD:-0}" "$FETCH_OK"
 fi
 ```
+
+### Stage 1.5 — squash planning commits (opt-in)
+
+**Gate:** Run only when `squash_planning_commits_before_fork` from init is `true` AND `action == "needs_fork"`. Skip entirely otherwise (including when reusing an existing phase branch, since history was already shaped on the prior run).
+
+**Purpose:** When `commit_docs` is on, discuss/plan-phase auto-commits each doc change as its own commit on the default branch. Forking the phase branch then carries (or leaves behind, with the drift gate) a tail of N tiny `.planning/`-only commits. This stage consolidates that tail into a single doc commit so the default branch keeps a clean history.
+
+**Detection rules (must all hold for the run to be a squash candidate):**
+
+1. HEAD must be on the configured default branch — if the user is on a feature branch already, do nothing.
+2. Walk backward from HEAD collecting the contiguous run of commits whose changed paths are entirely under `.planning/`. A commit touching any non-`.planning` path (including mixed `.planning` + code) is a barrier — stop walking, do NOT include it.
+3. None of the commits in the run may already exist on `origin/$DEFAULT_BRANCH`. If any are pushed, abort the squash with a warning and proceed straight to Stage 2 without rewriting history.
+4. If the run length is < 2, skip silently — nothing to consolidate.
+
+Run the detection block:
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+SQUASH_STATUS=skipped
+SQUASH_COUNT=0
+SQUASH_REASON=""
+SQUASH_OLDEST=""
+SQUASH_PARENT=""
+SQUASH_SUBJECTS=""
+
+if [ "$CURRENT_BRANCH" != "$DEFAULT_BRANCH" ]; then
+  SQUASH_REASON="not_on_default_branch"
+else
+  # Walk back from HEAD collecting contiguous .planning-only commits.
+  CANDIDATES=""
+  SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+  while [ -n "$SHA" ]; do
+    # Stop at root commit (no parent).
+    PARENTS=$(git rev-list --parents -n 1 "$SHA" 2>/dev/null | awk '{$1=""; print $0}' | sed 's/^ //')
+    if [ -z "$PARENTS" ]; then break; fi
+
+    CHANGED=$(git show --no-renames --name-only --pretty=format: "$SHA" 2>/dev/null | sed '/^$/d')
+    if [ -z "$CHANGED" ]; then break; fi
+
+    # Treat as barrier if any path is outside .planning/.
+    OUTSIDE=$(printf '%s\n' "$CHANGED" | grep -v -E '^\.planning/' || true)
+    if [ -n "$OUTSIDE" ]; then break; fi
+
+    CANDIDATES="$CANDIDATES $SHA"
+    # Move to first parent.
+    SHA=$(echo "$PARENTS" | awk '{print $1}')
+  done
+
+  SQUASH_COUNT=$(echo $CANDIDATES | wc -w | tr -d ' ')
+
+  if [ "${SQUASH_COUNT:-0}" -lt 2 ]; then
+    SQUASH_STATUS=skipped
+    SQUASH_REASON="too_few_candidates"
+  else
+    # Oldest candidate is the last token in CANDIDATES (since we appended HEAD-first).
+    SQUASH_OLDEST=$(echo $CANDIDATES | awk '{print $NF}')
+    SQUASH_PARENT="${SQUASH_OLDEST}^"
+
+    # Safety: any candidate already on origin/$DEFAULT_BRANCH → abort.
+    PUSHED_HIT=""
+    if git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
+      for C in $CANDIDATES; do
+        if git merge-base --is-ancestor "$C" "origin/$DEFAULT_BRANCH" 2>/dev/null; then
+          PUSHED_HIT="$C"
+          break
+        fi
+      done
+    fi
+
+    if [ -n "$PUSHED_HIT" ]; then
+      SQUASH_STATUS=aborted
+      SQUASH_REASON="already_pushed:$PUSHED_HIT"
+    else
+      SQUASH_STATUS=candidate
+      # Collect subjects in chronological order (oldest → newest).
+      SQUASH_SUBJECTS=$(git --no-pager log --reverse --format='%h %s' "${SQUASH_PARENT}..HEAD" 2>/dev/null)
+    fi
+  fi
+fi
+
+# JSON contract — last line for orchestrator parsing.
+printf '{"squash_status":"%s","squash_count":%s,"squash_reason":"%s","squash_oldest":"%s","squash_parent":"%s"}\n' \
+  "$SQUASH_STATUS" "${SQUASH_COUNT:-0}" "$SQUASH_REASON" "$SQUASH_OLDEST" "$SQUASH_PARENT"
+
+if [ "$SQUASH_STATUS" = "candidate" ]; then
+  echo "---SQUASH_SUBJECTS---"
+  echo "$SQUASH_SUBJECTS"
+  echo "---END_SQUASH_SUBJECTS---"
+fi
+```
+
+**Decide and prompt:**
+
+- **`squash_status == "skipped"`:** No-op. Continue to Stage 2.
+- **`squash_status == "aborted"`:** Print one warning line — `⚠ Skipping planning-commit squash: $SQUASH_REASON` — and continue to Stage 2 without rewriting history.
+- **`squash_status == "candidate"`:** Show the count + subjects (chronological) and prompt:
+
+  ```
+  ## Consolidate planning commits before phase fork?
+
+  $SQUASH_COUNT contiguous .planning-only commits at HEAD on '$DEFAULT_BRANCH':
+
+  <subjects, one per line>
+
+  Squash them into a single doc commit before forking '$BRANCH_NAME'?
+  ```
+
+  If `TEXT_MODE` is true, present as a plain-text yes/no prompt. Otherwise use AskUserQuestion with header "Squash?" and two options: "Yes — consolidate" (Recommended) / "No — keep history as-is".
+
+  - **Yes:** Run the squash block below, then continue to Stage 2.
+  - **No:** Continue to Stage 2 without rewriting history.
+
+**Squash block (only on user yes):**
+
+```bash
+# Build the consolidated commit message: header + chronological subjects.
+COMBINED_BODY=$(echo "$SQUASH_SUBJECTS" | sed 's/^[a-f0-9]* /- /')
+COMMIT_MSG=$(printf 'docs(planning): consolidate %s planning commits\n\n%s\n' \
+  "$SQUASH_COUNT" "$COMBINED_BODY")
+
+# Refuse if the working tree is dirty — we do not want to fold uncommitted changes.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ERROR: working tree is dirty; cannot squash safely. Commit or stash, then re-run." >&2
+  exit 1
+fi
+
+git reset --soft "$SQUASH_PARENT" \
+  || { echo "ERROR: git reset --soft to $SQUASH_PARENT failed." >&2; exit 1; }
+git commit -q -m "$COMMIT_MSG" \
+  || { echo "ERROR: git commit for squashed planning commits failed. Repo left with staged index at $SQUASH_PARENT — restore with 'git reset --hard ORIG_HEAD'." >&2; exit 1; }
+
+echo "Consolidated $SQUASH_COUNT planning commits into $(git rev-parse --short HEAD)."
+```
+
+**Note:** the squash mutates local `$DEFAULT_BRANCH`. The Stage 1 drift detection (already executed above) is now stale by exactly `SQUASH_COUNT - 1` commits — Stage 2 must re-run drift detection if the squash happened. Simplest implementation: re-execute the Stage 1 detect block after a successful squash to refresh `DRIFT_AHEAD` / `DRIFT_LOG` before Stage 2 prompts.
 
 ### Stage 2 — decide
 
