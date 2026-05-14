@@ -276,9 +276,11 @@ DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
 if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
   # Existing branch path — no fork needed, no drift question.
   git switch "$BRANCH_NAME" || { echo "ERROR: Could not switch to existing branch '$BRANCH_NAME'." >&2; exit 1; }
-  printf '{"action":"reused_existing","default_branch":"%s","drift_ahead":0}\n' "$DEFAULT_BRANCH"
+  printf '{"action":"reused_existing","default_branch":"%s"}\n' "$DEFAULT_BRANCH"
 else
-  # Fork path — fetch first so the drift comparison is against fresh origin.
+  # Fork path — fetch first so the post-squash drift comparison (Stage 2) is
+  # against fresh origin. Drift itself is measured AFTER Stage 1.5's squash so
+  # the count reflects post-squash state.
   FETCH_OK=true
   if ! git fetch --quiet origin "$DEFAULT_BRANCH"; then  # #2916
     git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH" \
@@ -287,30 +289,9 @@ else
     FETCH_OK=false
   fi
 
-  # Count commits on local $DEFAULT_BRANCH that are NOT on origin/$DEFAULT_BRANCH.
-  # If both refs exist and the count is > 0, the new phase branch would lose those
-  # commits when forked off origin. Typical cause: plan/discuss-phase committed
-  # planning artifacts to local main without pushing.
-  DRIFT_AHEAD=0
-  DRIFT_LOG=""
-  if git show-ref --verify --quiet "refs/heads/$DEFAULT_BRANCH" \
-     && git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
-    DRIFT_AHEAD=$(git rev-list --count "origin/$DEFAULT_BRANCH..$DEFAULT_BRANCH" 2>/dev/null || echo 0)
-    if [ "${DRIFT_AHEAD:-0}" -gt 0 ]; then
-      DRIFT_LOG=$(git --no-pager log --oneline "origin/$DEFAULT_BRANCH..$DEFAULT_BRANCH" | head -10)
-    fi
-  fi
-
-  if [ "${DRIFT_AHEAD:-0}" -gt 0 ]; then
-    echo ""
-    echo "Local '$DEFAULT_BRANCH' is ahead of 'origin/$DEFAULT_BRANCH' by $DRIFT_AHEAD commit(s):"
-    echo "$DRIFT_LOG"
-    echo ""
-  fi
-
   # JSON contract for the orchestrator (last line of stdout for easy parsing).
-  printf '{"action":"needs_fork","default_branch":"%s","drift_ahead":%s,"fetch_ok":%s}\n' \
-    "$DEFAULT_BRANCH" "${DRIFT_AHEAD:-0}" "$FETCH_OK"
+  printf '{"action":"needs_fork","default_branch":"%s","fetch_ok":%s}\n' \
+    "$DEFAULT_BRANCH" "$FETCH_OK"
 fi
 ```
 
@@ -450,15 +431,45 @@ git commit -q -m "$COMMIT_MSG" \
 echo "Consolidated $SQUASH_COUNT planning commits into $(git rev-parse --short HEAD)."
 ```
 
-**Note:** the squash mutates local `$DEFAULT_BRANCH`. The Stage 1 drift detection (already executed above) is now stale by exactly `SQUASH_COUNT - 1` commits — Stage 2 must re-run drift detection if the squash happened. Simplest implementation: re-execute the Stage 1 detect block after a successful squash to refresh `DRIFT_AHEAD` / `DRIFT_LOG` before Stage 2 prompts.
+### Stage 2 — detect drift and decide
 
-### Stage 2 — decide
-
-Parse the JSON line printed by Stage 1. Fields: `action`, `default_branch`, `drift_ahead`, `fetch_ok`.
+Parse the JSON line printed by Stage 1. Fields: `action`, `default_branch`, `fetch_ok`.
 
 - **`action == "reused_existing"`:** Branch already prepared. Skip to "All subsequent commits…" line below.
-- **`action == "needs_fork"` AND `drift_ahead == 0`:** Proceed to Stage 3 (`mode=origin`) immediately. No prompt.
-- **`action == "needs_fork"` AND `drift_ahead > 0`:** Resolve drift before forking.
+- **`action == "needs_fork"`:** Run the drift-detection block below (post-squash, so the count reflects post-Stage-1.5 state). If `DRIFT_AHEAD == 0`, proceed to Stage 3 (`FORK_MODE=origin`) with no prompt. Otherwise, resolve drift before forking.
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
+
+# Count commits on local $DEFAULT_BRANCH that are NOT on origin/$DEFAULT_BRANCH.
+# Computed here (after Stage 1.5's optional squash) so the count and the
+# warning below reflect post-squash reality. If both refs exist and the count
+# is > 0, the new phase branch would lose those commits when forked off origin.
+# Typical cause: plan/discuss-phase committed planning artifacts to local
+# $DEFAULT_BRANCH without pushing.
+DRIFT_AHEAD=0
+DRIFT_LOG=""
+if git show-ref --verify --quiet "refs/heads/$DEFAULT_BRANCH" \
+   && git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
+  DRIFT_AHEAD=$(git rev-list --count "origin/$DEFAULT_BRANCH..$DEFAULT_BRANCH" 2>/dev/null || echo 0)
+  if [ "${DRIFT_AHEAD:-0}" -gt 0 ]; then
+    DRIFT_LOG=$(git --no-pager log --oneline "origin/$DEFAULT_BRANCH..$DEFAULT_BRANCH" | head -10)
+  fi
+fi
+
+if [ "${DRIFT_AHEAD:-0}" -gt 0 ]; then
+  echo ""
+  echo "Local '$DEFAULT_BRANCH' is ahead of 'origin/$DEFAULT_BRANCH' by $DRIFT_AHEAD commit(s):"
+  echo "$DRIFT_LOG"
+  echo ""
+fi
+
+# JSON contract for the orchestrator (last line of stdout for easy parsing).
+printf '{"drift_ahead":%s}\n' "${DRIFT_AHEAD:-0}"
+```
+
+When `DRIFT_AHEAD > 0`, resolve drift before forking.
 
 Check override:
 ```bash

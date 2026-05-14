@@ -1,0 +1,4 @@
+---
+type: Fixed
+---
+**`/gsd-execute-phase` drift detection now runs after the planning-commit squash, not before.** Previously, `handle_branching` measured `DRIFT_AHEAD` in Stage 1, printed the `Local '<branch>' is ahead of 'origin/...' by N commit(s)` warning, then ran the optional Stage 1.5 squash, then prompted the user with the stale Stage 1 count. Users opting into `git.squash_planning_commits_before_fork` saw the original pre-squash count both in the early warning and in the "Push?" prompt, even after consolidating N commits into one. The drift compute, the warning echo, and the `drift_ahead` field have moved out of Stage 1's JSON contract into a new bash block at the head of Stage 2, so both the warning and the prompt count always reflect post-squash state. Stage 1's JSON contract now emits only `{action, default_branch, fetch_ok}` (or `{action, default_branch}` for `reused_existing`); Stage 2 emits `{drift_ahead}` on its own line.
