@@ -238,6 +238,83 @@ brownfield code with thin coverage):
 enforcing the verify-command dimension; you'll have to manage test coverage
 manually.
 
+### `nyquist_compliant` frontmatter — when does it flip to `true`?
+
+`{NN}-VALIDATION.md` is written by `/gsd-plan-phase` from a template that
+**defaults the flag to `false`**:
+
+```yaml
+---
+phase: N
+status: draft
+nyquist_compliant: false   ← default; never auto-flipped
+wave_0_complete: false
+---
+```
+
+Nothing in the standard loop (`plan-phase`, `execute-phase`, `verify-work`,
+`ship`) ever flips it. Only **`/gsd-validate-phase N`** does (via the
+`gsd-nyquist-auditor` agent) once it confirms every requirement has automated
+verification and the sign-off checklist passes:
+
+- **COMPLIANT** — `nyquist_compliant: true` AND every per-task row ✅ green.
+- **PARTIAL** — file exists, flag still `false`, some rows ❌/⬜ or escalated
+  to manual-only.
+- **MISSING** — no `VALIDATION.md` (only happens with `workflow.nyquist_validation: false`).
+
+`/gsd-audit-milestone` reads each phase's `VALIDATION.md` and flags
+`nyquist_compliant: false` phases as PARTIAL, recommending you run
+`/gsd-validate-phase N` for each before `/gsd-complete-milestone`. You can do
+this per-phase or batch it once at milestone close — either works.
+
+### Adversarial review — when to run which one
+
+GSD ships two adversarial reviews, both explicitly described as
+*adversarial* in their agent prompts. The gstack `/codex challenge` skill is
+a useful third-opinion add-on if installed.
+
+| Tool | Target | Stance | Position | Output |
+|---|---|---|---|---|
+| `/gsd-review --phase N --all` | **Plans** (pre-execute) | External AI CLIs (Gemini, Claude, Codex, OpenCode, Qwen, Cursor) peer-review the PLAN files | between `plan-phase` and `execute-phase` | `{NN}-REVIEWS.md` (feed back via `plan-phase --reviews`) |
+| `/gsd-plan-review-convergence N --all [--max-cycles M]` | **Plans** (pre-execute) | Same as above, looped until no HIGH concerns | same | replans + final `REVIEWS.md` |
+| `/gsd-code-review N --depth=deep` | **Shipped code** | `gsd-code-reviewer` agent with explicit "FORCE stance: assume every implementation contains defects". BLOCKER / WARNING classification only — no "INFO" downgrades. | between `execute-phase` and `verify-work` | `{NN}-REVIEW.md` |
+| `/gsd-code-review N --fix --auto` | **Shipped code** | Same adversarial reviewer + `gsd-code-fixer` in a review → fix → re-review loop (max 3 iterations) | same | `REVIEW.md` + atomic fix commits |
+| `/gsd-audit-fix --severity high --max 5` | **Cross-phase audit findings** | Wraps an audit source (default `audit-uat`) with classify → fix → commit | pre-milestone-close | atomic fix commits |
+| `/codex challenge` *(gstack, optional)* | **Shipped code** | Different model family adversarially trying to break your code | after `/gsd-code-review --fix --auto`, before `verify-work` | inline report |
+
+**Rules of thumb:**
+
+- **End of each phase** is the primary slot — `/gsd-code-review N --fix
+  --auto` between `execute-phase` and `verify-work`. Running it only at
+  milestone close means a huge diff and the fix commits would land
+  out-of-phase, defeating GSD's atomic-commit-per-phase contract.
+- **Pre-execute** is for catching *design* problems, not *code* problems —
+  use `/gsd-review` (one-shot) or `/gsd-plan-review-convergence` (loop) when
+  the phase plan is non-trivial or you want a second opinion before spending
+  execute-time tokens.
+- **Pre-milestone-close** is for *aggregate* sweeps that no single phase
+  review can catch — `/gsd-audit-uat` to surface outstanding UAT items and
+  `/gsd-audit-fix --severity high` to auto-remediate.
+- The `--depth` flag on `code-review` defaults to `standard`; bump to `deep`
+  for cross-file analysis (import graphs, call chains) once per phase or just
+  before milestone close on the highest-risk phases.
+
+### Where the adversarial gates slot in (compact view)
+
+```
+plan-phase ─► [pre-execute adversarial — design level]                ─► execute-phase ─► [post-execute adversarial — code level]   ─► verify-work
+              /gsd-review --phase N --all                                                  /gsd-code-review N --fix --auto
+              /gsd-plan-review-convergence N --all                                         /codex challenge  (optional, external)
+              (loop until no HIGH concern)
+
+  ... per-phase loop continues until all phases done ...
+
+audit-milestone ─► [cross-phase aggregate sweep]   ─► complete-milestone
+                   /gsd-audit-uat
+                   /gsd-audit-fix --severity high
+                   /gsd-validate-phase N (per flagged phase, if Nyquist gaps)
+```
+
 ---
 
 ## 4. Diagram — side workflows (remediation, parallel, retroactive)
